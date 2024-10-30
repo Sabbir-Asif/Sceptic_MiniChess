@@ -1,7 +1,4 @@
 
----
-
-```markdown
 # Minichess AI
 
 This project is an AI-based Minichess game designed to play against a human or AI opponent. Minichess is a compact version of traditional chess played on a smaller 6x5 board, reducing the complexity while maintaining strategic depth. The project incorporates the Minimax algorithm with alpha-beta pruning to efficiently search for optimal moves, along with a custom evaluation function to gauge board positions.
@@ -113,5 +110,3 @@ Here are some useful resources that inspired this project and may help you under
 - [Chess Game AI Project - GitHub (ahmadrazakhawaja)](https://github.com/ahmadrazakhawaja/chess-game-AI-project/blob/master/playchess.py)
 - [Python Chess AI Tutorial - YouTube (AlejoG10)](https://www.youtube.com/watch?v=OpL0Gcfn4B4)
 - [AI in Games - YouTube Playlist](https://www.youtube.com/watch?v=D1O5dmpCmxI&list=PLnWzgq1mKyAsFZoMyZQbB8bNuNufSD0Sz&index=19)
-
----
