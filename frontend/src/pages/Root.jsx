@@ -1,4 +1,4 @@
-import Banner from "../components/Banner/Banner";
+import { Outlet } from "react-router-dom";
 import Navbar from "../components/Navbar/Navbar";
 
 const Root = () => {
@@ -7,7 +7,7 @@ const Root = () => {
             <div className="flex">
                 <Navbar />
                 <span className="mt-24 container mx-auto">
-                    <Banner />
+                    <Outlet />
                 </span>
             </div>
         </div>

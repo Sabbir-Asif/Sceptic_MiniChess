@@ -6,11 +6,23 @@ import {
 } from "react-router-dom";
 import "./index.css";
 import Root from "./pages/Root";
+import MiniChessBoard from "./components/chessBoard/MiniChessBoard";
+import Banner from "./components/Banner/Banner";
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <Root />,
+    children: [
+      {
+        path: 'home',
+        element: <Banner />
+      },
+      {
+        path: 'playai',
+        element: <MiniChessBoard />
+      }
+    ]
   },
 ]);
 
