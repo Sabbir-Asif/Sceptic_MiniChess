@@ -51,7 +51,7 @@ const Navbar = () => {
                     </div>
                 </div>
 
-                <div className="absolute bottom-1">
+                <div className="absolute bottom-0">
                     <span className="flex gap-1 items-center text-gray-400">
                         <MdInfo className="text-lg" />
                         <p className="font-medium">Sceptic</p>
