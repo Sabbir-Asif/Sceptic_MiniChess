@@ -8,7 +8,7 @@ const Banner = () => {
             <div className="">
                 <div className="space-y-4">
                     <h2 className="text-5xl text-base-300 font-bold">Play an exciting version of chess!</h2>
-                    <span className="flex justify-center gap-10 text-sm font-medium italic text-gray-400">
+                    <span className="flex justify-start gap-10 text-sm font-medium italic text-gray-400">
                         <p>Mini Chess 6x5 version</p>
                         <p>play now!</p>
                     </span>
