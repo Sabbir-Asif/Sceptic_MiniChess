@@ -6,7 +6,7 @@ const Root = () => {
         <div className="bg-black-secondary font-poppins">
             <div className="flex">
                 <Navbar />
-                <span className="mt-24 container mx-auto">
+                <span className=" max-h-screen my-auto overflow-scroll container mx-auto">
                     <Outlet />
                 </span>
             </div>
