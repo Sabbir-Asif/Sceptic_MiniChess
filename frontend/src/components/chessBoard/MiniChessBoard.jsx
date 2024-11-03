@@ -190,10 +190,10 @@ const MiniChessBoard = () => {
         </div>
         <div className="text-green-info">
           <h2 className="text-lg font-bold">Game History</h2>
-          <div className="mt-2">
+          <div className="mt-2 max-h-[530px] overflow-scroll">
             {gameHistory.map((move, index) => (
               <div key={index}
-                className='text-gray-300 text-center max-h-[580px] overflow-scroll'>
+                className='text-gray-300 text-center'>
                 {move}
               </div>
             ))}

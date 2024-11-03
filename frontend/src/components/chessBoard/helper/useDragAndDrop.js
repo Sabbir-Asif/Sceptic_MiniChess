@@ -41,17 +41,14 @@ const useDragAndDrop = (
         const capturedPiece = newBoard[endRow][endCol];
         newBoard[endRow][endCol] = draggedPiece;
         newBoard[originalPosition.row][originalPosition.col] = '.';
-
         setBoard(newBoard);
         setMoveCount(prevCount => prevCount + 1);
+        checkGameOver();
         setCurrentPlayer(current => current === 'w' ? 'b' : 'w');
         
         const notation = createMoveNotation(draggedPiece, capturedPiece, endRow, endCol);
         setGameHistory(prevHistory => [...prevHistory, notation]);
         setHighlightedCells([]);
-        
-        // Check game over after the move is completed
-        setTimeout(checkGameOver, 0);
       }
     }
     resetDrag();
