@@ -1,9 +1,13 @@
 import { FaUserFriends } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 const Banner = () => {
+
+    const navigate = useNavigate();
+
     return (
         <div className="flex justify-center items-center gap-16 p-4 max-w-5xl mx-auto">
             <div className="">
-                <img src="https://www.chess.com/bundles/web/images/offline-play/standardboard.1d6f9426.png" alt="Chess Image" />
+                <img src="/images/minichess.png" alt="Chess Image" />
             </div>
             <div className="">
                 <div className="space-y-4">
@@ -20,7 +24,9 @@ const Banner = () => {
                             <p className="mt-1">Play with AI</p>
                         </span>
                     </button>
-                    <button className="p-6 bg-black-primary rounded-md border-black border text-base-300 text-2xl font-semibold hover:border hover:border-b-green-600 hover:border-b-4">
+                    <button className="p-6 bg-black-primary rounded-md border-black border text-base-300 text-2xl font-semibold hover:border hover:border-b-green-600 hover:border-b-4"
+                    onClick={()=> {navigate('/play-human')}}
+                    >
                         <span className="flex items-center gap-2">
                             <FaUserFriends className="text-3xl" />
                             <p className="mt-1">Play with Friend</p>

@@ -8,26 +8,50 @@ import "./index.css";
 import Root from "./pages/Root";
 import MiniChessBoard from "./components/chessBoard/MiniChessBoard";
 import Banner from "./components/Banner/Banner";
+import SignUp from "./pages/Signup";
+import SignIn from "./pages/Signin";
+import ForgotPassword from "./pages/ForgetPassword";
+import AuthProvider from "./components/Authentication/AuthProvider";
+import Home from "./pages/Home";
+import Rules from "./pages/Rules";
 
 const router = createBrowserRouter([
+  {
+    path: "/sign-up",
+    element: <SignUp />
+  },
+  {
+    path: "/sign-in",
+    element: <SignIn />
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPassword />
+  },
   {
     path: "/",
     element: <Root />,
     children: [
       {
-        path: 'home',
+        path: '',
         element: <Banner />
       },
       {
-        path: 'playai',
+        path: '/play-human',
         element: <MiniChessBoard />
+      },
+      {
+        path: 'rules',
+        element: <Rules />
       }
     ]
-  },
+  }
 ]);
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   </React.StrictMode>
 );
