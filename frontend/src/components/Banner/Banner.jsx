@@ -18,7 +18,9 @@ const Banner = () => {
                     </span>
                 </div>
                 <div className="mt-9 flex flex-col gap-4 max-w-80 justify-center">
-                    <button className="p-6 bg-green-secondary rounded-md border-b-green-700 border-b-4 text-base-300 text-3xl font-semibold hover:border hover:border-b-green-600 hover:border-b-4">
+                    <button className="p-6 bg-green-secondary rounded-md border-b-green-700 border-b-4 text-base-300 text-3xl font-semibold hover:border hover:border-b-green-600 hover:border-b-4"
+                    onClick={()=> {navigate('/playai')}}
+                    >
                         <span className="flex items-center gap-2">
                             <img src="https://cdn.iconscout.com/icon/free/png-256/free-ai-robot-icon-download-in-svg-png-gif-file-formats--robotic-machine-artificial-intelligence-deep-learning-pack-network-communication-icons-3339935.png?f=webp&h=112" alt="ai" className="w-10" />
                             <p className="mt-1">Play with AI</p>

@@ -14,6 +14,7 @@ import ForgotPassword from "./pages/ForgetPassword";
 import AuthProvider from "./components/Authentication/AuthProvider";
 import Home from "./pages/Home";
 import Rules from "./pages/Rules";
+import StateEvaluationChessBoard from "./components/WeightedRandomChess/StateEvaluationChessBoard";
 
 const router = createBrowserRouter([
   {
@@ -39,6 +40,10 @@ const router = createBrowserRouter([
       {
         path: '/play-human',
         element: <MiniChessBoard />
+      },
+      {
+        path: '/playai',
+        element: <StateEvaluationChessBoard />
       },
       {
         path: 'rules',
