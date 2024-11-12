@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import blackKing from '/images/bK.png';
 import blackQueen from '/images/bQ.png';
 import blackBishop from '/images/bB.png';
@@ -12,7 +12,7 @@ import whiteKnight from '/images/wN.png';
 import whiteRook from '/images/wR.png';
 import whitePawn from '/images/wP.png';
 import useDragAndDrop from './helper/useDragAndDrop';
-import getValidMoves from './helper/MoveLogic';
+import getValidMoves from './helper/MoveLogic'
 
 const pieceValues = {
   p: 1,
@@ -104,7 +104,7 @@ const StateEvaluationChessBoard = () => {
       return !isInCheck(piece[0], simulatedBoard);
     });
   };
-  
+
   const hasLegalMoves = (color) => {
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
@@ -135,12 +135,39 @@ const StateEvaluationChessBoard = () => {
       }
     }
 
-    // Position evaluation
+    // Positional evaluation
     const centerControl = (row, col) => {
       if (row >= 2 && row <= 3 && col >= 1 && col <= 3) {
         return 0.3; // Center squares are valuable
       }
       return 0;
+    };
+
+    const mobilityScore = (piece, row, col) => {
+      const legalMoves = getLegalMoves(piece, row, col);
+      return legalMoves.length * 0.1;
+    };
+
+    const kingsSafetyScore = (currentBoard) => {
+      const whiteKingPos = findKingPosition('w', currentBoard);
+      const blackKingPos = findKingPosition('b', currentBoard);
+
+      let whiteKingSafetyScore = 0;
+      let blackKingSafetyScore = 0;
+
+      if (whiteKingPos) {
+        const whiteKingRow = whiteKingPos.row;
+        const whiteKingCol = whiteKingPos.col;
+        whiteKingSafetyScore = (4 - Math.abs(whiteKingRow - 3)) * 0.2 + (2 - Math.abs(whiteKingCol - 2)) * 0.2;
+      }
+
+      if (blackKingPos) {
+        const blackKingRow = blackKingPos.row;
+        const blackKingCol = blackKingPos.col;
+        blackKingSafetyScore = (4 - Math.abs(blackKingRow - 2)) * 0.2 + (2 - Math.abs(blackKingCol - 2)) * 0.2;
+      }
+
+      return (whiteKingSafetyScore - blackKingSafetyScore) * multiplier;
     };
 
     // Add positional bonuses
@@ -149,32 +176,37 @@ const StateEvaluationChessBoard = () => {
         const piece = currentBoard[row][col];
         if (piece !== '.') {
           score += centerControl(row, col) * (piece[0] === 'b' ? 1 : -1);
+          score += mobilityScore(piece, row, col) * (piece[0] === 'b' ? 1 : -1);
         }
       }
     }
 
+    // King safety
+    score += kingsSafetyScore(currentBoard);
+
     // Check status
     if (isInCheck('w', currentBoard)) {
-      score += 0.5;
+      score -= 0.5 * multiplier;
     }
     if (isInCheck('b', currentBoard)) {
-      score -= 0.5;
+      score += 0.5 * multiplier;
     }
 
-    return score * multiplier;
+    return score;
   };
 
   const getMinMaxMove = (depth, isMaximizing, alpha, beta, currentBoard, color) => {
     // Check if the AI's king is in check
     const isAIInCheck = isInCheck(color, currentBoard);
-  
-    if (depth === 0) {
+
+    // If the search depth is 0 or the game is over, return the evaluated score
+    if (depth === 0 || !hasLegalMoves(color)) {
       return { score: evaluateBoard(currentBoard, color) };
     }
-  
+
     let bestMove = null;
     let bestScore = isMaximizing ? -Infinity : Infinity;
-  
+
     // Get all legal moves for the current player
     const moves = [];
     for (let row = 0; row < 6; row++) {
@@ -192,7 +224,7 @@ const StateEvaluationChessBoard = () => {
         }
       }
     }
-  
+
     // If the AI's king is in check, prioritize moves that get the king out of check
     if (isAIInCheck) {
       moves.sort((a, b) => {
@@ -200,13 +232,13 @@ const StateEvaluationChessBoard = () => {
         const bNewBoard = simulateMove(b.from.row, b.from.col, b.to.row, b.to.col, currentBoard);
         const aInCheck = isInCheck(color, aNewBoard);
         const bInCheck = isInCheck(color, bNewBoard);
-  
+
         if (aInCheck && !bInCheck) return 1;
         if (!aInCheck && bInCheck) return -1;
         return 0;
       });
     }
-  
+
     for (const move of moves) {
       const newBoard = simulateMove(
         move.from.row,
@@ -215,7 +247,7 @@ const StateEvaluationChessBoard = () => {
         move.to.col,
         currentBoard
       );
-  
+
       const result = getMinMaxMove(
         depth - 1,
         !isMaximizing,
@@ -224,7 +256,7 @@ const StateEvaluationChessBoard = () => {
         newBoard,
         color
       );
-  
+
       if (isMaximizing) {
         if (result.score > bestScore) {
           bestScore = result.score;
@@ -238,12 +270,12 @@ const StateEvaluationChessBoard = () => {
         }
         beta = Math.min(beta, bestScore);
       }
-  
+
       if (beta <= alpha) {
         break;
       }
     }
-  
+
     return { move: bestMove, score: bestScore };
   };
 
@@ -357,123 +389,123 @@ const StateEvaluationChessBoard = () => {
     currentPlayer,
     setCurrentPlayer,
     setGameHistory,
-    setHighlightedCells,
-    gameOver,
-    getLegalMoves
+  setHighlightedCells,
+  gameOver,
+  getLegalMoves
+);
+
+const resetGame = () => {
+  setBoard(initialBoard);
+  setHighlightedCells([]);
+  setMoveCount(0);
+  setCurrentPlayer('w');
+  setGameOver(false);
+  setGameHistory([]);
+  setShowModal(false);
+  setSideConfirmed(false);
+  setInCheck(false);
+};
+
+const renderCell = (cell, row, col) => {
+  const highlight = highlightedCells.find(
+    (highlight) => highlight.row === row && highlight.col === col
   );
 
-  const resetGame = () => {
-    setBoard(initialBoard);
-    setHighlightedCells([]);
-    setMoveCount(0);
-    setCurrentPlayer('w');
-    setGameOver(false);
-    setGameHistory([]);
-    setShowModal(false);
-    setSideConfirmed(false);
-    setInCheck(false);
-  };
-
-  const renderCell = (cell, row, col) => {
-    const highlight = highlightedCells.find(
-      (highlight) => highlight.row === row && highlight.col === col
-    );
-
-    const isKingInCheck = cell !== '.' && 
-      cell[1] === 'k' && 
-      isInCheck(cell[0], board) && 
-      findKingPosition(cell[0], board)?.row === row && 
-      findKingPosition(cell[0], board)?.col === col;
-
-    return (
-      <div
-        key={`${row}-${col}`}
-        className={`w-24 h-24 flex items-center justify-center border relative 
-          ${(row + col) % 2 === 0 ? 'bg-green-primary' : 'bg-green-info'}
-          ${isKingInCheck ? 'ring-2 ring-red-500' : ''}
-        `}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={() => onDrop(row, col)}
-        onClick={() => cell !== '.' && handlePieceClick(cell, row, col)}
-      >
-        {highlight && (
-          <div
-            className={`absolute w-16 h-16 rounded-full 
-              ${highlight.isCapture ? 'bg-red-500' : 'bg-black'} 
-              opacity-30 z-10`}
-          />
-        )}
-        {cell !== '.' && (
-          <img
-            src={pieceImages[cell]}
-            alt={cell}
-            className="w-20 h-20 z-20 relative"
-            draggable
-            onDragStart={() => onDragStart(cell, row, col)}
-            onDragEnd={onDragEndOutsideBoard}
-          />
-        )}
-      </div>
-    );
-  };
-
-  if (!sideConfirmed) {
-    return (
-      <div className="max-w-5xl mx-auto flex flex-col items-center">
-        <h1 className="text-4xl font-bold mb-4 text-green-info">Choose Your Side</h1>
-        <select value={userSide} onChange={(e) => setUserSide(e.target.value)} className="select select-bordered mb-4 w-full max-w-xs">
-          <option value="w">White</option>
-          <option value="b">Black</option>
-        </select>
-        <button
-          onClick={() => setSideConfirmed(true)}
-          className="btn btn-primary"
-        >
-          Confirm
-        </button>
-      </div>
-    );
-  }
+  const isKingInCheck = cell !== '.' && 
+    cell[1] === 'k' && 
+    isInCheck(cell[0], board) && 
+    findKingPosition(cell[0], board)?.row === row && 
+    findKingPosition(cell[0], board)?.col === col;
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col items-center">
-      <h1 className="text-4xl font-bold mb-2 text-green-info">5x6 Chess Game</h1>
-      <h2 className="text-lg text-gray-300 font-medium mb-4">You are playing as: {userSide === 'w' ? 'White' : 'Black'}</h2>
-      <h2 className="text-lg text-gray-300 font-medium mb-4">
-        Current Turn: <span className={currentPlayer === 'w' ? 'text-green-info' : 'text-green-info'}>
-          {currentPlayer === 'w' ? 'White' : 'Black'}
-        </span>
-        {inCheck && <span className="text-red-500 ml-2">(Check!)</span>}
-      </h2>
-      <div className="flex gap-4">
-        <div className="relative grid grid-cols-5">
-          {board.map((row, rowIndex) =>
-            row.map((cell, colIndex) => renderCell(cell, rowIndex, colIndex))
-          )}
-        </div>
-        <div className="text-green-info">
-          <h2 className="text-lg font-bold">Game History</h2>
-          <div className="mt-2 max-h-[530px] overflow-scroll">
-            {gameHistory.map((move, index) => (
-              <div key={index} className='text-gray-300 text-center'>{move}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {showModal && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Game Over!</h3>
-            <p className="py-4">{modalMessage}</p>
-            <div className="modal-action">
-              <button className="btn" onClick={resetGame}>Play Again</button>
-            </div>
-          </div>
-        </div>
+    <div
+      key={`${row}-${col}`}
+      className={`w-24 h-24 flex items-center justify-center border relative 
+        ${(row + col) % 2 === 0 ? 'bg-green-primary' : 'bg-green-info'}
+        ${isKingInCheck ? 'ring-2 ring-red-500' : ''}
+      `}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={() => onDrop(row, col)}
+      onClick={() => cell !== '.' && handlePieceClick(cell, row, col)}
+    >
+      {highlight && (
+        <div
+          className={`absolute w-16 h-16 rounded-full 
+            ${highlight.isCapture ? 'bg-red-500' : 'bg-black'} 
+            opacity-30 z-10`}
+        />
+      )}
+      {cell !== '.' && (
+        <img
+          src={pieceImages[cell]}
+          alt={cell}
+          className="w-20 h-20 z-20 relative"
+          draggable
+          onDragStart={() => onDragStart(cell, row, col)}
+          onDragEnd={onDragEndOutsideBoard}
+        />
       )}
     </div>
   );
+};
+
+if (!sideConfirmed) {
+  return (
+    <div className="max-w-5xl mx-auto flex flex-col items-center">
+      <h1 className="text-4xl font-bold mb-4 text-green-info">Choose Your Side</h1>
+      <select value={userSide} onChange={(e) => setUserSide(e.target.value)} className="select select-bordered mb-4 w-full max-w-xs">
+        <option value="w">White</option>
+        <option value="b">Black</option>
+      </select>
+      <button
+        onClick={() => setSideConfirmed(true)}
+        className="btn btn-primary"
+      >
+        Confirm
+      </button>
+    </div>
+  );
+}
+
+return (
+  <div className="max-w-5xl mx-auto flex flex-col items-center">
+    <h1 className="text-4xl font-bold mb-2 text-green-info">5x6 Chess Game</h1>
+    <h2 className="text-lg text-gray-300 font-medium mb-4">You are playing as: {userSide === 'w' ? 'White' : 'Black'}</h2>
+    <h2 className="text-lg text-gray-300 font-medium mb-4">
+      Current Turn: <span className={currentPlayer === 'w' ? 'text-green-info' : 'text-green-info'}>
+        {currentPlayer === 'w' ? 'White' : 'Black'}
+      </span>
+      {inCheck && <span className="text-red-500 ml-2">(Check!)</span>}
+    </h2>
+    <div className="flex gap-4">
+      <div className="relative grid grid-cols-5">
+        {board.map((row, rowIndex) =>
+          row.map((cell, colIndex) => renderCell(cell, rowIndex, colIndex))
+        )}
+      </div>
+      <div className="text-green-info">
+        <h2 className="text-lg font-bold">Game History</h2>
+        <div className="mt-2 max-h-[530px] overflow-scroll">
+          {gameHistory.map((move, index) => (
+            <div key={index} className='text-gray-300 text-center'>{move}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {showModal && (
+      <div className="modal modal-open">
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">Game Over!</h3>
+          <p className="py-4">{modalMessage}</p>
+          <div className="modal-action">
+            <button className="btn" onClick={resetGame}>Play Again</button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+);
 };
 
 export default StateEvaluationChessBoard;
