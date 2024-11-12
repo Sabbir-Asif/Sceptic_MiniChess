@@ -1,4 +1,4 @@
-const getValidMoves = (piece, startRow, startCol, board) => {
+const getValidMoves = (piece, startRow, startCol, board, ignoreCheck = false) => {
     const moves = [];
     const color = piece[0];
     const type = piece[1];

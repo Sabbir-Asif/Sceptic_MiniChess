@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import getValidMoves from './MoveLogic';
 
 const useDragAndDrop = (
   board,
@@ -10,7 +9,8 @@ const useDragAndDrop = (
   setCurrentPlayer,
   setGameHistory,
   setHighlightedCells,
-  gameOver
+  gameOver,
+  getLegalMoves
 ) => {
   const [draggedPiece, setDraggedPiece] = useState(null);
   const [originalPosition, setOriginalPosition] = useState(null);
@@ -20,9 +20,9 @@ const useDragAndDrop = (
       setDraggedPiece(piece);
       setOriginalPosition({ row: startRow, col: startCol });
 
-      // Show valid moves when dragging starts
-      const validMoves = getValidMoves(piece, startRow, startCol, board);
-      const newHighlightedCells = validMoves.map(move => ({
+      // Show legal moves when dragging starts
+      const legalMoves = getLegalMoves(piece, startRow, startCol);
+      const newHighlightedCells = legalMoves.map(move => ({
         row: move.row,
         col: move.col,
         isCapture: board[move.row][move.col] !== '.'
@@ -33,37 +33,36 @@ const useDragAndDrop = (
 
   const onDrop = (endRow, endCol) => {
     if (draggedPiece && originalPosition && !gameOver) {
-      const validMoves = getValidMoves(draggedPiece, originalPosition.row, originalPosition.col, board);
-      const isValidMove = validMoves.some(move => move.row === endRow && move.col === endCol);
+      const legalMoves = getLegalMoves(draggedPiece, originalPosition.row, originalPosition.col);
+      const isValidMove = legalMoves.some(move => move.row === endRow && move.col === endCol);
 
       if (isValidMove) {
         const newBoard = board.map(row => [...row]);
         const capturedPiece = newBoard[endRow][endCol];
-        if (capturedPiece !== ".") {
-          const moveSound = new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3");
-          moveSound.play();
-        } else {
-          const moveSound = new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-opponent.mp3");
-          moveSound.play();
-        }
         newBoard[endRow][endCol] = draggedPiece;
         newBoard[originalPosition.row][originalPosition.col] = '.';
+
+        if (capturedPiece !== ".") {
+          new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3").play();
+        } else {
+          new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-opponent.mp3").play();
+        }
+
         setBoard(newBoard);
         setMoveCount(prevCount => prevCount + 1);
-        checkGameOver();
-        setCurrentPlayer(current => current === 'w' ? 'b' : 'w');
-
-        const notation = createMoveNotation(draggedPiece, capturedPiece, endRow, endCol);
-        setGameHistory(prevHistory => [...prevHistory, notation]);
+        if (!checkGameOver(newBoard)) {
+          setCurrentPlayer(current => current === 'w' ? 'b' : 'w');
+        }
         setHighlightedCells([]);
+      } else {
+        new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/illegal.mp3").play();
       }
     }
     resetDrag();
   };
 
   const onDragEndOutsideBoard = () => {
-    const moveSound = new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/illegal.mp3");
-    moveSound.play();
+    new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/illegal.mp3").play();
     resetDrag();
     setHighlightedCells([]);
   };
@@ -71,16 +70,6 @@ const useDragAndDrop = (
   const resetDrag = () => {
     setDraggedPiece(null);
     setOriginalPosition(null);
-  };
-
-  const createMoveNotation = (piece, capturedPiece, endRow, endCol) => {
-    const pieceNotation = piece[1].toUpperCase();
-    const targetSquare = `${String.fromCharCode(97 + endCol)}${6 - endRow}`;
-
-    if (capturedPiece !== '.') {
-      return `${pieceNotation}x${targetSquare}`;
-    }
-    return pieceNotation === 'P' ? targetSquare : `${pieceNotation}${targetSquare}`;
   };
 
   return {

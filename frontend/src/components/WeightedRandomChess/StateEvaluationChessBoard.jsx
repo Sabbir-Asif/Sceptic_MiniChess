@@ -14,7 +14,6 @@ import whitePawn from '/images/wP.png';
 import useDragAndDrop from './helper/useDragAndDrop';
 import getValidMoves from './helper/MoveLogic';
 
-
 const pieceValues = {
   p: 1,
   n: 3,
@@ -59,23 +58,12 @@ const StateEvaluationChessBoard = () => {
   const [modalMessage, setModalMessage] = useState('');
   const [userSide, setUserSide] = useState('w');
   const [sideConfirmed, setSideConfirmed] = useState(false);
+  const [inCheck, setInCheck] = useState(false);
 
-  const resetGame = () => {
-    setBoard(initialBoard);
-    setHighlightedCells([]);
-    setMoveCount(0);
-    setCurrentPlayer('w');
-    setGameOver(false);
-    setGameHistory([]);
-    setShowModal(false);
-    setSideConfirmed(false);
-  };
-
-  
-  const findKingPosition = (color) => {
+  const findKingPosition = (color, currentBoard = board) => {
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
-        if (board[row][col] === (color === 'w' ? 'wk' : 'bk')) {
+        if (currentBoard[row][col] === `${color}k`) {
           return { row, col };
         }
       }
@@ -83,17 +71,16 @@ const StateEvaluationChessBoard = () => {
     return null;
   };
 
-
-  const isInCheck = (color) => {
-    const kingPos = findKingPosition(color);
+  const isInCheck = (color, testBoard = board) => {
+    const kingPos = findKingPosition(color, testBoard);
     if (!kingPos) return false;
 
     const opponentColor = color === 'w' ? 'b' : 'w';
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
-        const piece = board[row][col];
+        const piece = testBoard[row][col];
         if (piece[0] === opponentColor) {
-          const moves = getValidMoves(piece, row, col, board);
+          const moves = getValidMoves(piece, row, col, testBoard, true);
           if (moves.some(move => move.row === kingPos.row && move.col === kingPos.col)) {
             return true;
           }
@@ -103,17 +90,28 @@ const StateEvaluationChessBoard = () => {
     return false;
   };
 
+  const simulateMove = (startRow, startCol, endRow, endCol, currentBoard = board) => {
+    const newBoard = currentBoard.map(row => [...row]);
+    newBoard[endRow][endCol] = newBoard[startRow][startCol];
+    newBoard[startRow][startCol] = '.';
+    return newBoard;
+  };
+
+  const getLegalMoves = (piece, row, col) => {
+    const validMoves = getValidMoves(piece, row, col, board, true);
+    return validMoves.filter(move => {
+      const simulatedBoard = simulateMove(row, col, move.row, move.col);
+      return !isInCheck(piece[0], simulatedBoard);
+    });
+  };
 
   const hasLegalMoves = (color) => {
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
         const piece = board[row][col];
-        if (piece && piece[0] === color) {
-          const validMoves = getValidMoves(piece, row, col, board);
-          if (validMoves.some(move => {
-            const newBoard = simulateMove(row, col, move.row, move.col);
-            return !isInCheck(color, newBoard);
-          })) {
+        if (piece[0] === color) {
+          const legalMoves = getLegalMoves(piece, row, col);
+          if (legalMoves.length > 0) {
             return true;
           }
         }
@@ -122,86 +120,187 @@ const StateEvaluationChessBoard = () => {
     return false;
   };
 
-  const checkGameOver = () => {
-    const opponent = currentPlayer === 'w' ? 'b' : 'w';
-    if (!findKingPosition(currentPlayer)) {
-      setModalMessage(`${opponent} wins! The ${currentPlayer === 'w' ? 'white' : 'black'} king has been captured.`);
-      setShowModal(true);
-      setGameOver(true);
-    } else if (!hasLegalMoves(currentPlayer)) {
-      if (isInCheck(currentPlayer)) {
-        setModalMessage(`${opponent} wins by checkmate!`);
-      } else {
-        setModalMessage("It's a stalemate! Draw.");
+  const evaluateBoard = (currentBoard, forColor) => {
+    let score = 0;
+    const multiplier = forColor === 'b' ? 1 : -1;
+
+    // Material score
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 5; col++) {
+        const piece = currentBoard[row][col];
+        if (piece !== '.') {
+          const value = pieceValues[piece[1]] * (piece[0] === 'b' ? 1 : -1);
+          score += value;
+        }
       }
-      setShowModal(true);
-      setGameOver(true);
-    } else if (moveCount >= 40) {
-      setModalMessage('Draw! Maximum number of moves (40) reached.');
-      setShowModal(true);
-      setGameOver(true);
     }
+
+    // Position evaluation
+    const centerControl = (row, col) => {
+      if (row >= 2 && row <= 3 && col >= 1 && col <= 3) {
+        return 0.3; // Center squares are valuable
+      }
+      return 0;
+    };
+
+    // Add positional bonuses
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 5; col++) {
+        const piece = currentBoard[row][col];
+        if (piece !== '.') {
+          score += centerControl(row, col) * (piece[0] === 'b' ? 1 : -1);
+        }
+      }
+    }
+
+    // Check status
+    if (isInCheck('w', currentBoard)) {
+      score += 0.5;
+    }
+    if (isInCheck('b', currentBoard)) {
+      score -= 0.5;
+    }
+
+    return score * multiplier;
+  };
+
+  const getMinMaxMove = (depth, isMaximizing, alpha, beta, currentBoard, color) => {
+    if (depth === 0) {
+      return { score: evaluateBoard(currentBoard, color) };
+    }
+
+    const moves = [];
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 5; col++) {
+        const piece = currentBoard[row][col];
+        if (piece[0] === (isMaximizing ? color : (color === 'w' ? 'b' : 'w'))) {
+          const validMoves = getLegalMoves(piece, row, col);
+          validMoves.forEach(move => {
+            moves.push({
+              from: { row, col },
+              to: move,
+              piece
+            });
+          });
+        }
+      }
+    }
+
+    let bestMove = null;
+    let bestScore = isMaximizing ? -Infinity : Infinity;
+
+    for (const move of moves) {
+      const newBoard = simulateMove(
+        move.from.row,
+        move.from.col,
+        move.to.row,
+        move.to.col,
+        currentBoard
+      );
+
+      const result = getMinMaxMove(
+        depth - 1,
+        !isMaximizing,
+        alpha,
+        beta,
+        newBoard,
+        color
+      );
+
+      if (isMaximizing) {
+        if (result.score > bestScore) {
+          bestScore = result.score;
+          bestMove = move;
+        }
+        alpha = Math.max(alpha, bestScore);
+      } else {
+        if (result.score < bestScore) {
+          bestScore = result.score;
+          bestMove = move;
+        }
+        beta = Math.min(beta, bestScore);
+      }
+
+      if (beta <= alpha) {
+        break;
+      }
+    }
+
+    return { move: bestMove, score: bestScore };
   };
 
   const aiMove = () => {
     if (gameOver || currentPlayer !== (userSide === 'w' ? 'b' : 'w')) return;
 
-    let bestMove = null;
-    let bestScore = -Infinity;
-    for (let row = 0; row < 6; row++) {
-      for (let col = 0; col < 5; col++) {
-        const piece = board[row][col];
-        if (piece[0] === currentPlayer) {
-          const moves = getValidMoves(piece, row, col, board);
-          for (const move of moves) {
-            const newBoard = simulateMove(row, col, move.row, move.col);
-            const moveScore = evaluateBoard(newBoard);
-            if (moveScore > bestScore) {
-              bestScore = moveScore;
-              bestMove = { from: { row, col }, to: move };
-            }
-          }
-        }
-      }
-    }
-    if (bestMove) {
-      const { from, to } = bestMove;
-      setBoard(prevBoard => {
-        const updatedBoard = prevBoard.map(row => [...row]);
-        updatedBoard[to.row][to.col] = updatedBoard[from.row][from.col];
-        updatedBoard[from.row][from.col] = '.';
-        return updatedBoard;
-      });
+    const result = getMinMaxMove(3, true, -Infinity, Infinity, board, currentPlayer);
+    
+    if (result.move) {
+      const { from, to } = result.move;
+      const newBoard = simulateMove(from.row, from.col, to.row, to.col);
+      setBoard(newBoard);
       setMoveCount(prev => prev + 1);
-      setCurrentPlayer(currentPlayer === 'w' ? 'b' : 'w');
+      setCurrentPlayer(current => current === 'w' ? 'b' : 'w');
+
+      const notation = createMoveNotation(
+        board[from.row][from.col],
+        board[to.row][to.col],
+        to.row,
+        to.col
+      );
+      setGameHistory(prev => [...prev, notation]);
+
+      // Play sound based on move type
+      if (board[to.row][to.col] !== '.') {
+        new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3").play();
+      } else {
+        new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-opponent.mp3").play();
+      }
+
+      checkGameOver(newBoard);
     }
   };
 
+  const checkGameOver = (currentBoard = board) => {
+    const opponent = currentPlayer === 'w' ? 'b' : 'w';
+    
+    if (!findKingPosition(currentPlayer, currentBoard)) {
+      setModalMessage(`${opponent.toUpperCase()} wins! The ${currentPlayer === 'w' ? 'White' : 'Black'} king has been captured.`);
+      setShowModal(true);
+      setGameOver(true);
+      return true;
+    }
 
-  const evaluateBoard = (board) => {
-    let score = 0;
-    for (const row of board) {
-      for (const cell of row) {
-        if (cell !== '.') {
-          const value = pieceValues[cell[1]];
-          score += cell[0] === 'b' ? value : -value;
-        }
+    const inCheck = isInCheck(currentPlayer, currentBoard);
+    setInCheck(inCheck);
+
+    if (!hasLegalMoves(currentPlayer)) {
+      if (inCheck) {
+        setModalMessage(`${opponent.toUpperCase()} wins by checkmate!`);
+        setShowModal(true);
+        setGameOver(true);
+        return true;
+      } else {
+        setModalMessage("It's a stalemate! Draw.");
+        setShowModal(true);
+        setGameOver(true);
+        return true;
       }
     }
-    return score;
-  };
 
-  const simulateMove = (startRow, startCol, endRow, endCol) => {
-    const newBoard = board.map(row => [...row]);
-    newBoard[endRow][endCol] = newBoard[startRow][startCol];
-    newBoard[startRow][startCol] = '.';
-    return newBoard;
+    if (moveCount >= 40) {
+      setModalMessage('Draw! Maximum number of moves (40) reached.');
+      setShowModal(true);
+      setGameOver(true);
+      return true;
+    }
+
+    return false;
   };
 
   const handlePieceClick = (piece, row, col) => {
     if (!gameOver && piece[0] === currentPlayer) {
-      const validMoves = getValidMoves(piece, row, col, board);
-      const newHighlightedCells = validMoves.map(move => ({
+      const legalMoves = getLegalMoves(piece, row, col);
+      const newHighlightedCells = legalMoves.map(move => ({
         row: move.row,
         col: move.col,
         isCapture: board[move.row][move.col] !== '.'
@@ -218,11 +317,19 @@ const StateEvaluationChessBoard = () => {
 
   useEffect(() => {
     if (sideConfirmed && currentPlayer !== userSide) {
-      aiMove();
+      setTimeout(aiMove, 500);
     }
   }, [currentPlayer, sideConfirmed]);
 
-
+  const createMoveNotation = (piece, capturedPiece, endRow, endCol) => {
+    const pieceNotation = piece[1].toUpperCase();
+    const targetSquare = `${String.fromCharCode(97 + endCol)}${6 - endRow}`;
+    
+    if (capturedPiece !== '.') {
+      return `${pieceNotation}x${targetSquare}${isInCheck(currentPlayer === 'w' ? 'b' : 'w') ? '+' : ''}`;
+    }
+    return `${pieceNotation === 'P' ? '' : pieceNotation}${targetSquare}${isInCheck(currentPlayer === 'w' ? 'b' : 'w') ? '+' : ''}`;
+  };
 
   const { onDragStart, onDrop, onDragEndOutsideBoard } = useDragAndDrop(
     board,
@@ -233,19 +340,39 @@ const StateEvaluationChessBoard = () => {
     setCurrentPlayer,
     setGameHistory,
     setHighlightedCells,
-    gameOver
+    gameOver,
+    getLegalMoves
   );
+
+  const resetGame = () => {
+    setBoard(initialBoard);
+    setHighlightedCells([]);
+    setMoveCount(0);
+    setCurrentPlayer('w');
+    setGameOver(false);
+    setGameHistory([]);
+    setShowModal(false);
+    setSideConfirmed(false);
+    setInCheck(false);
+  };
 
   const renderCell = (cell, row, col) => {
     const highlight = highlightedCells.find(
       (highlight) => highlight.row === row && highlight.col === col
     );
 
+    const isKingInCheck = cell !== '.' && 
+      cell[1] === 'k' && 
+      isInCheck(cell[0], board) && 
+      findKingPosition(cell[0], board)?.row === row && 
+      findKingPosition(cell[0], board)?.col === col;
+
     return (
       <div
         key={`${row}-${col}`}
         className={`w-24 h-24 flex items-center justify-center border relative 
           ${(row + col) % 2 === 0 ? 'bg-green-primary' : 'bg-green-info'}
+          ${isKingInCheck ? 'ring-2 ring-red-500' : ''}
         `}
         onDragOver={(e) => e.preventDefault()}
         onDrop={() => onDrop(row, col)}
@@ -298,6 +425,7 @@ const StateEvaluationChessBoard = () => {
         Current Turn: <span className={currentPlayer === 'w' ? 'text-green-info' : 'text-green-info'}>
           {currentPlayer === 'w' ? 'White' : 'Black'}
         </span>
+        {inCheck && <span className="text-red-500 ml-2">(Check!)</span>}
       </h2>
       <div className="flex gap-4">
         <div className="relative grid grid-cols-5">
