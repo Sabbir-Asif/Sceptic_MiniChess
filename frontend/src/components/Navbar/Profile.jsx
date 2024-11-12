@@ -11,7 +11,7 @@ const Profile = ({ user, setUser, setIsDrawerOpen }) => {
         if (!newImageUrl) return;
 
         try {
-            const response = await axios.patch(`http://localhost:8080/api/v1/users/${user._id}`, {
+            const response = await axios.patch(`http://localhost:5000/api/v1/users/${user._id}`, {
                 displayName: user.displayName,
                 email: user.email,
                 imageUrl: newImageUrl,

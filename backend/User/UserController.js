@@ -5,6 +5,7 @@ const validateUser = require('./UserValidation');
 
 
 router.get('/v1/users/search', async (req, res) => {
+    console.log("Received request with query:", req.query); 
     try {
         const { displayName, email, imageUrl } = req.query;
         const filter = {};
@@ -21,10 +22,11 @@ router.get('/v1/users/search', async (req, res) => {
 
         res.status(200).json(users);
     } catch (error) {
-        console.error(error);
+        console.error("Error fetching users:", error); // Log any errors
         res.status(500).json({ message: "Failed to search users" });
     }
 });
+
 
 router.get('/v1/users', async (req,res) => {
     try{

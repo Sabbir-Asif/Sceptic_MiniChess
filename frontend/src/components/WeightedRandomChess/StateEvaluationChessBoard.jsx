@@ -104,7 +104,7 @@ const StateEvaluationChessBoard = () => {
       return !isInCheck(piece[0], simulatedBoard);
     });
   };
-
+  
   const hasLegalMoves = (color) => {
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
@@ -165,15 +165,22 @@ const StateEvaluationChessBoard = () => {
   };
 
   const getMinMaxMove = (depth, isMaximizing, alpha, beta, currentBoard, color) => {
+    // Check if the AI's king is in check
+    const isAIInCheck = isInCheck(color, currentBoard);
+  
     if (depth === 0) {
       return { score: evaluateBoard(currentBoard, color) };
     }
-
+  
+    let bestMove = null;
+    let bestScore = isMaximizing ? -Infinity : Infinity;
+  
+    // Get all legal moves for the current player
     const moves = [];
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
         const piece = currentBoard[row][col];
-        if (piece[0] === (isMaximizing ? color : (color === 'w' ? 'b' : 'w'))) {
+        if (piece[0] === color) {
           const validMoves = getLegalMoves(piece, row, col);
           validMoves.forEach(move => {
             moves.push({
@@ -185,10 +192,21 @@ const StateEvaluationChessBoard = () => {
         }
       }
     }
-
-    let bestMove = null;
-    let bestScore = isMaximizing ? -Infinity : Infinity;
-
+  
+    // If the AI's king is in check, prioritize moves that get the king out of check
+    if (isAIInCheck) {
+      moves.sort((a, b) => {
+        const aNewBoard = simulateMove(a.from.row, a.from.col, a.to.row, a.to.col, currentBoard);
+        const bNewBoard = simulateMove(b.from.row, b.from.col, b.to.row, b.to.col, currentBoard);
+        const aInCheck = isInCheck(color, aNewBoard);
+        const bInCheck = isInCheck(color, bNewBoard);
+  
+        if (aInCheck && !bInCheck) return 1;
+        if (!aInCheck && bInCheck) return -1;
+        return 0;
+      });
+    }
+  
     for (const move of moves) {
       const newBoard = simulateMove(
         move.from.row,
@@ -197,7 +215,7 @@ const StateEvaluationChessBoard = () => {
         move.to.col,
         currentBoard
       );
-
+  
       const result = getMinMaxMove(
         depth - 1,
         !isMaximizing,
@@ -206,7 +224,7 @@ const StateEvaluationChessBoard = () => {
         newBoard,
         color
       );
-
+  
       if (isMaximizing) {
         if (result.score > bestScore) {
           bestScore = result.score;
@@ -220,12 +238,12 @@ const StateEvaluationChessBoard = () => {
         }
         beta = Math.min(beta, bestScore);
       }
-
+  
       if (beta <= alpha) {
         break;
       }
     }
-
+  
     return { move: bestMove, score: bestScore };
   };
 
