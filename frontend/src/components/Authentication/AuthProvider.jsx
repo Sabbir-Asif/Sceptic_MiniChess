@@ -18,7 +18,7 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (email) => {
-    const res = await fetch(`http://localhost:8080/api/v1/users/search?email=${email}`);
+    const res = await fetch(`http://localhost:5000/api/v1/users/search?email=${email}`);
     const data = await res.json();
     return data.length > 0 ? data[0] : null;
   };
@@ -33,7 +33,7 @@ const AuthProvider = ({ children }) => {
       const imageUrl = result.user?.photoURL || 'https://media.istockphoto.com/id/1300845620/vector/user-icon-flat-isolated-on-white-background-user-symbol-vector-illustration.jpg?s=612x612&w=0&k=20&c=yBeyba0hUkh14_jgv1OKqIH0CCSWU_4ckRkAoy2p73o=';
       const newUser = { displayName, email, imageUrl };
 
-      const response = await fetch('http://localhost:8080/api/v1/users', {
+      const response = await fetch('http://localhost:5000/api/v1/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser),

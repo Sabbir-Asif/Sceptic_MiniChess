@@ -105,7 +105,6 @@ const getValidMoves = (piece, startRow, startCol, board) => {
             });
             break;
     }
-
     return moves;
 };
 

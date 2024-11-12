@@ -7,7 +7,7 @@ const { createClient } = require('redis');
 const socketIo = require('socket.io');
 const users = require('./User/UserController');
 
-const port = process.env.PORT || 8080;
+const port = 5000;
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: '*' } });
