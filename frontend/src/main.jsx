@@ -15,6 +15,7 @@ import AuthProvider from "./components/Authentication/AuthProvider";
 import Home from "./pages/Home";
 import Rules from "./pages/Rules";
 import StateEvaluationChessBoard from "./components/WeightedRandomChess/StateEvaluationChessBoard";
+import Records from "./pages/Records";
 
 const router = createBrowserRouter([
   {
@@ -48,6 +49,10 @@ const router = createBrowserRouter([
       {
         path: 'rules',
         element: <Rules />
+      },
+      {
+        path: 'records',
+        element: <Records />
       }
     ]
   }

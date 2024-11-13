@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import blackKing from '/images/bK.png';
 import blackQueen from '/images/bQ.png';
 import blackBishop from '/images/bB.png';
@@ -12,12 +12,13 @@ import whiteKnight from '/images/wN.png';
 import whiteRook from '/images/wR.png';
 import whitePawn from '/images/wP.png';
 import useDragAndDrop from './helper/useDragAndDrop';
-import getValidMoves from './helper/MoveLogic'
+import getValidMoves from './helper/MoveLogic';
+import { AuthContext } from '../Authentication/AuthProvider';
 
 const pieceValues = {
   p: 1,
   n: 3,
-  b: 3,
+  b: 3.5,
   r: 5,
   q: 9,
   k: 100
@@ -48,6 +49,7 @@ const initialBoard = [
 ];
 
 const StateEvaluationChessBoard = () => {
+  const { user } = useContext(AuthContext);
   const [board, setBoard] = useState(initialBoard);
   const [highlightedCells, setHighlightedCells] = useState([]);
   const [moveCount, setMoveCount] = useState(0);
@@ -59,6 +61,8 @@ const StateEvaluationChessBoard = () => {
   const [userSide, setUserSide] = useState('w');
   const [sideConfirmed, setSideConfirmed] = useState(false);
   const [inCheck, setInCheck] = useState(false);
+  const [isSavingGame, setIsSavingGame] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   const findKingPosition = (color, currentBoard = board) => {
     for (let row = 0; row < 6; row++) {
@@ -135,84 +139,94 @@ const StateEvaluationChessBoard = () => {
       }
     }
 
-    // Positional evaluation
-    const centerControl = (row, col) => {
-      if (row >= 2 && row <= 3 && col >= 1 && col <= 3) {
-        return 0.3; // Center squares are valuable
-      }
-      return 0;
+    // Pawn structure
+    let pawnsPerSide = {
+      w: 0,
+      b: 0
     };
-
-    const mobilityScore = (piece, row, col) => {
-      const legalMoves = getLegalMoves(piece, row, col);
-      return legalMoves.length * 0.1;
+    let pawnChains = {
+      w: 0,
+      b: 0
     };
-
-    const kingsSafetyScore = (currentBoard) => {
-      const whiteKingPos = findKingPosition('w', currentBoard);
-      const blackKingPos = findKingPosition('b', currentBoard);
-
-      let whiteKingSafetyScore = 0;
-      let blackKingSafetyScore = 0;
-
-      if (whiteKingPos) {
-        const whiteKingRow = whiteKingPos.row;
-        const whiteKingCol = whiteKingPos.col;
-        whiteKingSafetyScore = (4 - Math.abs(whiteKingRow - 3)) * 0.2 + (2 - Math.abs(whiteKingCol - 2)) * 0.2;
-      }
-
-      if (blackKingPos) {
-        const blackKingRow = blackKingPos.row;
-        const blackKingCol = blackKingPos.col;
-        blackKingSafetyScore = (4 - Math.abs(blackKingRow - 2)) * 0.2 + (2 - Math.abs(blackKingCol - 2)) * 0.2;
-      }
-
-      return (whiteKingSafetyScore - blackKingSafetyScore) * multiplier;
+    let isolatedPawns = {
+      w: 0,
+      b: 0
     };
-
-    // Add positional bonuses
+    let doubledPawns = {
+      w: 0,
+      b: 0
+    };
+    let passedPawns = {
+      w: 0,
+      b: 0
+    };
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
         const piece = currentBoard[row][col];
-        if (piece !== '.') {
-          score += centerControl(row, col) * (piece[0] === 'b' ? 1 : -1);
-          score += mobilityScore(piece, row, col) * (piece[0] === 'b' ? 1 : -1);
+        if (piece[1] === 'p') {
+          const color = piece[0];
+          pawnsPerSide[color]++;
+
+          // Pawn chains
+          if (col > 0 && currentBoard[row][col - 1][1] === 'p' && currentBoard[row][col - 1][0] === color) {
+            pawnChains[color]++;
+          }
+          if (col < 4 && currentBoard[row][col + 1][1] === 'p' && currentBoard[row][col + 1][0] === color) {
+            pawnChains[color]++;
+          }
+
+          // Isolated pawns
+          if ((col === 0 || currentBoard[row][col - 1][1] !== 'p' || currentBoard[row][col - 1][0] !== color) &&
+              (col === 4 || currentBoard[row][col + 1][1] !== 'p' || currentBoard[row][col + 1][0] !== color)) {
+            isolatedPawns[color]++;
+          }
+
+          // Doubled pawns
+          if (row > 0 && currentBoard[row - 1][col][1] === 'p' && currentBoard[row - 1][col][0] === color) {
+            doubledPawns[color]++;
+          }
+
+          // Passed pawns
+          let passedPawn = true;
+          for (let i = col - 1; i >= 0; i--) {
+            if (currentBoard[row][i][1] === 'p' && currentBoard[row][i][0] === color) {
+              passedPawn = false;
+              break;
+            }
+          }
+          if (passedPawn) {
+            passedPawns[color]++;
+          }
         }
       }
     }
 
-    // King safety
-    score += kingsSafetyScore(currentBoard);
+    score += (pawnsPerSide[forColor] - pawnsPerSide[forColor === 'w' ? 'b' : 'w']) * 0.1;
+    score += (pawnChains[forColor] - pawnChains[forColor === 'w' ? 'b' : 'w']) * 0.2;
+    score += (isolatedPawns[forColor === 'w' ? 'b' : 'w'] - isolatedPawns[forColor]) * 0.3;
+    score += (doubledPawns[forColor === 'w' ? 'b' : 'w'] - doubledPawns[forColor]) * 0.2;
+    score += (passedPawns[forColor] - passedPawns[forColor === 'w' ? 'b' : 'w']) * 0.4;
 
-    // Check status
-    if (isInCheck('w', currentBoard)) {
-      score -= 0.5 * multiplier;
+    if (isInCheck(forColor, currentBoard)) {
+      score -= 0.5;
     }
-    if (isInCheck('b', currentBoard)) {
-      score += 0.5 * multiplier;
+    if (isInCheck(forColor === 'w' ? 'b' : 'w', currentBoard)) {
+      score += 0.5;
     }
 
-    return score;
+    return score * multiplier;
   };
 
   const getMinMaxMove = (depth, isMaximizing, alpha, beta, currentBoard, color) => {
-    // Check if the AI's king is in check
-    const isAIInCheck = isInCheck(color, currentBoard);
-
-    // If the search depth is 0 or the game is over, return the evaluated score
-    if (depth === 0 || !hasLegalMoves(color)) {
+    if (depth === 0) {
       return { score: evaluateBoard(currentBoard, color) };
     }
 
-    let bestMove = null;
-    let bestScore = isMaximizing ? -Infinity : Infinity;
-
-    // Get all legal moves for the current player
     const moves = [];
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 5; col++) {
         const piece = currentBoard[row][col];
-        if (piece[0] === color) {
+        if (piece[0] === (isMaximizing ? color : (color === 'w' ? 'b' : 'w'))) {
           const validMoves = getLegalMoves(piece, row, col);
           validMoves.forEach(move => {
             moves.push({
@@ -225,19 +239,8 @@ const StateEvaluationChessBoard = () => {
       }
     }
 
-    // If the AI's king is in check, prioritize moves that get the king out of check
-    if (isAIInCheck) {
-      moves.sort((a, b) => {
-        const aNewBoard = simulateMove(a.from.row, a.from.col, a.to.row, a.to.col, currentBoard);
-        const bNewBoard = simulateMove(b.from.row, b.from.col, b.to.row, b.to.col, currentBoard);
-        const aInCheck = isInCheck(color, aNewBoard);
-        const bInCheck = isInCheck(color, bNewBoard);
-
-        if (aInCheck && !bInCheck) return 1;
-        if (!aInCheck && bInCheck) return -1;
-        return 0;
-      });
-    }
+    let bestMove = null;
+    let bestScore = isMaximizing ? -Infinity : Infinity;
 
     for (const move of moves) {
       const newBoard = simulateMove(
@@ -282,7 +285,7 @@ const StateEvaluationChessBoard = () => {
   const aiMove = () => {
     if (gameOver || currentPlayer !== (userSide === 'w' ? 'b' : 'w')) return;
 
-    const result = getMinMaxMove(3, true, -Infinity, Infinity, board, currentPlayer);
+    const result = getMinMaxMove(6, true, -Infinity, Infinity, board, currentPlayer);
     
     if (result.move) {
       const { from, to } = result.move;
@@ -299,7 +302,6 @@ const StateEvaluationChessBoard = () => {
       );
       setGameHistory(prev => [...prev, notation]);
 
-      // Play sound based on move type
       if (board[to.row][to.col] !== '.') {
         new Audio("https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3").play();
       } else {
@@ -310,43 +312,120 @@ const StateEvaluationChessBoard = () => {
     }
   };
 
+  const saveGame = async (winner) => {
+    if (!user || isSavingGame) return;
+
+    setIsSavingGame(true);
+    setSaveError(null);
+
+    try {
+      let result;
+      if (winner === 'draw') {
+        result = 'draw';
+      } else {
+        result = winner === userSide ? 'win' : 'lose';
+      }
+
+      const gameData = {
+        user: user._id,
+        result,
+        history: gameHistory.map(move => ({
+          move,
+          timestamp: new Date()
+        }))
+      };
+
+      const response = await fetch('http://localhost:8080/api/v1/games', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(gameData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save game');
+      }
+
+      const savedGame = await response.json();
+      console.log('Game saved successfully:', savedGame);
+    } catch (error) {
+      console.error('Error saving game:', error);
+      setSaveError('Failed to save game. Please try again.');
+    } finally {
+      setIsSavingGame(false);
+    }
+  };
+
   const checkGameOver = (currentBoard = board) => {
     const opponent = currentPlayer === 'w' ? 'b' : 'w';
     
     if (!findKingPosition(currentPlayer, currentBoard)) {
+      const winner = opponent;
       setModalMessage(`${opponent.toUpperCase()} wins! The ${currentPlayer === 'w' ? 'White' : 'Black'} king has been captured.`);
       setShowModal(true);
       setGameOver(true);
+      saveGame(winner);
       return true;
-    }
-
-    const inCheck = isInCheck(currentPlayer, currentBoard);
-    setInCheck(inCheck);
-
-    if (!hasLegalMoves(currentPlayer)) {
-      if (inCheck) {
-        setModalMessage(`${opponent.toUpperCase()} wins by checkmate!`);
-        setShowModal(true);
-        setGameOver(true);
-        return true;
-      } else {
-        setModalMessage("It's a stalemate! Draw.");
-        setShowModal(true);
-        setGameOver(true);
-        return true;
-      }
     }
 
     if (moveCount >= 40) {
       setModalMessage('Draw! Maximum number of moves (40) reached.');
       setShowModal(true);
       setGameOver(true);
+      saveGame('draw');
       return true;
     }
+
+    const inCheck = isInCheck(currentPlayer, currentBoard);
+    setInCheck(inCheck);
 
     return false;
   };
 
+  const checkmated = (color) => {
+    
+    if (!isInCheck(color) || !hasLegalMoves(color)) {
+      return false; 
+    }
+  
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 5; col++) {
+        const piece = board[row][col];
+        if (piece[0] === color) {
+          const legalMoves = getLegalMoves(piece, row, col);
+  
+          for (const move of legalMoves) {
+            const simulatedBoard = simulateMove(row, col, move.row, move.col, board);
+  
+            if (!isInCheck(color, simulatedBoard)) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+
+    return true;
+  };
+  
+  useEffect(() => {
+    if (checkmated(currentPlayer)) {
+      const winner = currentPlayer === 'w' ? 'b' : 'w';
+      setModalMessage(`${currentPlayer === 'w' ? 'White' : 'Black'} is checkmated! Game over.`);
+      setShowModal(true);
+      setGameOver(true);
+      saveGame(winner);
+    } else if (!hasLegalMoves(currentPlayer)) {
+      const winner = currentPlayer === 'w' ? 'b' : 'w';
+      setModalMessage(`${currentPlayer === 'w' ? 'White' : 'Black'} is checkmated! Game over.`);
+      setShowModal(true);
+      setGameOver(true);
+      saveGame(winner);
+    }
+  }, [board, currentPlayer]);
+
+  
   const handlePieceClick = (piece, row, col) => {
     if (!gameOver && piece[0] === currentPlayer) {
       const legalMoves = getLegalMoves(piece, row, col);
@@ -379,133 +458,138 @@ const StateEvaluationChessBoard = () => {
       return `${pieceNotation}x${targetSquare}${isInCheck(currentPlayer === 'w' ? 'b' : 'w') ? '+' : ''}`;
     }
     return `${pieceNotation === 'P' ? '' : pieceNotation}${targetSquare}${isInCheck(currentPlayer === 'w' ? 'b' : 'w') ? '+' : ''}`;
+
   };
 
-  const { onDragStart, onDrop, onDragEndOutsideBoard } = useDragAndDrop(
+  const resetGame = () => {
+    setBoard(initialBoard);
+    setHighlightedCells([]);
+    setMoveCount(0);
+    setCurrentPlayer('w');
+    setGameOver(false);
+    setGameHistory([]);
+    setShowModal(false);
+    setSideConfirmed(false);
+    setInCheck(false);
+  };
+
+  const {
+    onDragStart,
+    onDrop,
+    onDragEndOutsideBoard,
+  } = useDragAndDrop(
     board,
     setBoard,
     setMoveCount,
-    checkGameOver,
+    checkGameOver, 
     currentPlayer,
     setCurrentPlayer,
     setGameHistory,
-  setHighlightedCells,
-  gameOver,
-  getLegalMoves
-);
-
-const resetGame = () => {
-  setBoard(initialBoard);
-  setHighlightedCells([]);
-  setMoveCount(0);
-  setCurrentPlayer('w');
-  setGameOver(false);
-  setGameHistory([]);
-  setShowModal(false);
-  setSideConfirmed(false);
-  setInCheck(false);
-};
-
-const renderCell = (cell, row, col) => {
-  const highlight = highlightedCells.find(
-    (highlight) => highlight.row === row && highlight.col === col
+    setHighlightedCells,
+    gameOver,
+    getLegalMoves
   );
 
-  const isKingInCheck = cell !== '.' && 
-    cell[1] === 'k' && 
-    isInCheck(cell[0], board) && 
-    findKingPosition(cell[0], board)?.row === row && 
-    findKingPosition(cell[0], board)?.col === col;
+  const renderCell = (cell, row, col) => {
+    const highlight = highlightedCells.find(
+      (highlight) => highlight.row === row && highlight.col === col
+    );
 
-  return (
-    <div
-      key={`${row}-${col}`}
-      className={`w-24 h-24 flex items-center justify-center border relative 
-        ${(row + col) % 2 === 0 ? 'bg-green-primary' : 'bg-green-info'}
-        ${isKingInCheck ? 'ring-2 ring-red-500' : ''}
-      `}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={() => onDrop(row, col)}
-      onClick={() => cell !== '.' && handlePieceClick(cell, row, col)}
-    >
-      {highlight && (
-        <div
-          className={`absolute w-16 h-16 rounded-full 
-            ${highlight.isCapture ? 'bg-red-500' : 'bg-black'} 
-            opacity-30 z-10`}
-        />
-      )}
-      {cell !== '.' && (
-        <img
-          src={pieceImages[cell]}
-          alt={cell}
-          className="w-20 h-20 z-20 relative"
-          draggable
-          onDragStart={() => onDragStart(cell, row, col)}
-          onDragEnd={onDragEndOutsideBoard}
-        />
-      )}
-    </div>
-  );
-};
+    const isKingInCheck = cell !== '.' && 
+      cell[1] === 'k' && 
+      isInCheck(cell[0], board) && 
+      findKingPosition(cell[0], board)?.row === row && 
+      findKingPosition(cell[0], board)?.col === col;
 
-if (!sideConfirmed) {
-  return (
-    <div className="max-w-5xl mx-auto flex flex-col items-center">
-      <h1 className="text-4xl font-bold mb-4 text-green-info">Choose Your Side</h1>
-      <select value={userSide} onChange={(e) => setUserSide(e.target.value)} className="select select-bordered mb-4 w-full max-w-xs">
-        <option value="w">White</option>
-        <option value="b">Black</option>
-      </select>
-      <button
-        onClick={() => setSideConfirmed(true)}
-        className="btn btn-primary"
+    return (
+      <div
+        key={`${row}-${col}`}
+        className={`w-24 h-24 flex items-center justify-center border relative 
+          ${(row + col) % 2 === 0 ? 'bg-green-primary' : 'bg-green-info'}
+          ${isKingInCheck ? 'ring-2 ring-red-500' : ''}
+        `}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => onDrop(row, col)}
+        onClick={() => cell !== '.' && handlePieceClick(cell, row, col)}
       >
-        Confirm
-      </button>
-    </div>
-  );
-}
-
-return (
-  <div className="max-w-5xl mx-auto flex flex-col items-center">
-    <h1 className="text-4xl font-bold mb-2 text-green-info">5x6 Chess Game</h1>
-    <h2 className="text-lg text-gray-300 font-medium mb-4">You are playing as: {userSide === 'w' ? 'White' : 'Black'}</h2>
-    <h2 className="text-lg text-gray-300 font-medium mb-4">
-      Current Turn: <span className={currentPlayer === 'w' ? 'text-green-info' : 'text-green-info'}>
-        {currentPlayer === 'w' ? 'White' : 'Black'}
-      </span>
-      {inCheck && <span className="text-red-500 ml-2">(Check!)</span>}
-    </h2>
-    <div className="flex gap-4">
-      <div className="relative grid grid-cols-5">
-        {board.map((row, rowIndex) =>
-          row.map((cell, colIndex) => renderCell(cell, rowIndex, colIndex))
+        {highlight && (
+          <div
+            className={`absolute w-16 h-16 rounded-full 
+              ${highlight.isCapture ? 'bg-red-500' : 'bg-black'} 
+              opacity-30 z-10`}
+          />
+        )}
+        {cell !== '.' && (
+          <img
+            src={pieceImages[cell]}
+            alt={cell}
+            className="w-20 h-20 z-20 relative"
+            draggable
+            onDragStart={() => onDragStart(cell, row, col)}
+            onDragEnd={onDragEndOutsideBoard}
+          />
         )}
       </div>
-      <div className="text-green-info">
-        <h2 className="text-lg font-bold">Game History</h2>
-        <div className="mt-2 max-h-[530px] overflow-scroll">
-          {gameHistory.map((move, index) => (
-            <div key={index} className='text-gray-300 text-center'>{move}</div>
-          ))}
-        </div>
-      </div>
-    </div>
+    );
+  };
 
-    {showModal && (
-      <div className="modal modal-open">
-        <div className="modal-box">
-          <h3 className="font-bold text-lg">Game Over!</h3>
-          <p className="py-4">{modalMessage}</p>
-          <div className="modal-action">
-            <button className="btn" onClick={resetGame}>Play Again</button>
+  if (!sideConfirmed) {
+    return (
+      <div className="max-w-5xl mx-auto flex flex-col items-center">
+        <h1 className="text-4xl font-bold mb-4 text-green-info">Choose Your Side</h1>
+        <select value={userSide} onChange={(e) => setUserSide(e.target.value)} className="select select-bordered mb-4 w-full max-w-xs">
+          <option value="w">White</option>
+          <option value="b">Black</option>
+        </select>
+        <button
+          onClick={() => setSideConfirmed(true)}
+          className="btn btn-primary bg-green-secondary hover:bg-green-primary border-none rounded-md text-md text-white"
+        >
+          Confirm
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto flex flex-col items-center">
+      <h1 className="text-4xl font-bold mb-2 text-green-info">5x6 Chess Game</h1>
+      <h2 className="text-lg text-gray-300 font-medium mb-4">You are playing as: {userSide === 'w' ? 'White' : 'Black'}</h2>
+      <h2 className="text-lg text-gray-300 font-medium mb-4">
+        Current Turn: <span className={currentPlayer === 'w' ? 'text-green-info' : 'text-green-info'}>
+          {currentPlayer === 'w' ? 'White' : 'Black'}
+        </span>
+        {inCheck && <span className="text-red-500 ml-2">(Check!)</span>}
+      </h2>
+      <div className="flex gap-4">
+        <div className="relative grid grid-cols-5">
+          {board.map((row, rowIndex) =>
+            row.map((cell, colIndex) => renderCell(cell, rowIndex, colIndex))
+          )}
+        </div>
+        <div className="text-green-info">
+          <h2 className="text-lg font-bold">Game History</h2>
+          <div className="mt-2 max-h-[530px] overflow-scroll">
+            {gameHistory.map((move, index) => (
+              <div key={index} className='text-gray-300 text-center'>{move}</div>
+            ))}
           </div>
         </div>
       </div>
-    )}
-  </div>
-);
+
+      {showModal && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Game Over!</h3>
+            <p className="py-4">{modalMessage}</p>
+            <div className="modal-action">
+              <button className="btn bg-green-secondary text-white" onClick={resetGame}>Play Again</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default StateEvaluationChessBoard;

@@ -18,7 +18,7 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (email) => {
-    const res = await fetch(`http://localhost:5000/api/v1/users/search?email=${email}`);
+    const res = await fetch(`http://localhost:8080/api/v1/users/search?email=${email}`);
     const data = await res.json();
     return data.length > 0 ? data[0] : null;
   };
